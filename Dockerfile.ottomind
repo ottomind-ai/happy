@@ -1,6 +1,8 @@
 # ottomind: happy-server ve web uygulaması tek imajda, tek port (Coolify, otto-ops-01).
 # Web uygulaması sunucunun kendi adresinden sunulur. Sunucu adresi build'e gömülmez; açılışta
 # HAPPY_SERVER_URL'den index.html'e yazılır, analitik de orada kapatılır.
+# Mobil uygulama özel sunucuyu kök sayfada "Welcome to Happy Server!" arayarak doğrular; kök sayfa web
+# uygulaması olduğu için bu metin aynı enjeksiyonla (banner alanı) index.html'e konur.
 # Kökteki Dockerfile'dan türetildi; web uygulaması upstream'in self-host paketindeki gibi
 # (happy-cli/scripts/bundle-webapp.cjs) reponun hoisted kurulumuyla derlenir. Upstream senkronunda
 # kökteki Dockerfile'daki değişiklikleri buraya taşı.
@@ -89,7 +91,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
 
 CMD ["sh", "-c", "\
   : \"${HAPPY_SERVER_URL:?HAPPY_SERVER_URL gerekli}\" && \
-  export HAPPY_INJECT_HTML_CONFIG=\"{\\\"serverUrl\\\":\\\"${HAPPY_SERVER_URL}\\\",\\\"disableAnalytics\\\":true}\" && \
+  export HAPPY_INJECT_HTML_CONFIG=\"{\\\"serverUrl\\\":\\\"${HAPPY_SERVER_URL}\\\",\\\"disableAnalytics\\\":true,\\\"banner\\\":\\\"Welcome to Happy Server!\\\"}\" && \
   if [ -n \"$DATABASE_URL\" ]; then \
     export DB_PROVIDER=postgres && ../../node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma; \
   else \
