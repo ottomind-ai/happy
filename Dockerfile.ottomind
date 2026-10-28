@@ -1,0 +1,98 @@
+# ottomind: happy-server ve web uygulaması tek imajda, tek port (Coolify, otto-ops-01).
+# Web uygulaması sunucunun kendi adresinden sunulur. Sunucu adresi build'e gömülmez; açılışta
+# HAPPY_SERVER_URL'den index.html'e yazılır, analitik de orada kapatılır.
+# Kökteki Dockerfile'dan türetildi; web uygulaması upstream'in self-host paketindeki gibi
+# (happy-cli/scripts/bundle-webapp.cjs) reponun hoisted kurulumuyla derlenir. Upstream senkronunda
+# kökteki Dockerfile'daki değişiklikleri buraya taşı.
+#
+# Ortam değişkenleri (Coolify):
+#   HAPPY_SERVER_URL     zorunlu, dış adres (https://happy.ops.ottomind.ai); yoksa konteyner açılmaz
+#   HANDY_MASTER_SECRET  zorunlu
+#   DATABASE_URL         Coolify Postgres'i (happy-db); verilmezse /data'da gömülü veritabanı (PGlite)
+
+# 1) Bağımlılıklar: kökteki Dockerfile'ınki
+FROM node:24 AS deps
+
+RUN apt-get update && apt-get install -y python3 make g++ build-essential && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
+
+WORKDIR /repo
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY scripts ./scripts
+COPY patches ./patches
+
+RUN mkdir -p packages/happy-app packages/happy-server packages/happy-cli packages/happy-agent packages/happy-wire
+
+COPY packages/happy-app/package.json packages/happy-app/
+COPY packages/happy-server/package.json packages/happy-server/
+COPY packages/happy-cli/package.json packages/happy-cli/
+COPY packages/happy-agent/package.json packages/happy-agent/
+COPY packages/happy-wire/package.json packages/happy-wire/
+
+COPY packages/happy-app/patches packages/happy-app/patches
+COPY packages/happy-server/prisma packages/happy-server/prisma
+COPY packages/happy-cli/scripts packages/happy-cli/scripts
+COPY packages/happy-cli/tools packages/happy-cli/tools
+
+RUN SKIP_HAPPY_WIRE_BUILD=1 pnpm install --frozen-lockfile
+
+# 2) Web uygulaması: analitik ve ödeme anahtarı olmadan
+FROM deps AS webapp
+
+ENV NODE_ENV=production
+ENV APP_ENV=production
+ENV EXPO_PUBLIC_DISABLE_ANALYTICS=1
+
+COPY packages/happy-wire ./packages/happy-wire
+COPY packages/happy-app ./packages/happy-app
+
+RUN pnpm --filter @slopus/happy-wire --fail-if-no-match build
+RUN cd packages/happy-app && pnpm exec expo export -p web --output-dir dist
+
+# 3) Sunucu: kökteki Dockerfile'ın derleme aşaması
+FROM deps AS builder
+
+COPY packages/happy-wire ./packages/happy-wire
+COPY packages/happy-server ./packages/happy-server
+
+RUN pnpm --filter @slopus/happy-wire --fail-if-no-match build
+RUN pnpm --filter happy-server --fail-if-no-match build
+
+# 4) Çalışma imajı: kökteki Dockerfile'ınki, üstüne web uygulaması, openssl (Prisma) ve root olmayan kullanıcı
+FROM node:24-slim AS runner
+
+WORKDIR /repo
+
+RUN apt-get update && apt-get install -y ffmpeg curl openssl && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+ENV DATA_DIR=/data
+ENV PGLITE_DIR=/data/pglite
+ENV HAPPY_STATIC_DIR=/repo/webapp
+
+COPY --from=builder /repo/node_modules /repo/node_modules
+COPY --from=builder /repo/packages/happy-wire /repo/packages/happy-wire
+COPY --from=builder /repo/packages/happy-server /repo/packages/happy-server
+COPY --from=webapp /repo/packages/happy-app/dist /repo/webapp
+
+RUN useradd --system --uid 10001 --home-dir /data happy && mkdir -p /data && chown happy /data
+USER happy
+
+VOLUME /data
+EXPOSE 3005
+
+WORKDIR /repo/packages/happy-server
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+  CMD curl -fsS http://127.0.0.1:3005/health || exit 1
+
+CMD ["sh", "-c", "\
+  : \"${HAPPY_SERVER_URL:?HAPPY_SERVER_URL gerekli}\" && \
+  export HAPPY_INJECT_HTML_CONFIG=\"{\\\"serverUrl\\\":\\\"${HAPPY_SERVER_URL}\\\",\\\"disableAnalytics\\\":true}\" && \
+  if [ -n \"$DATABASE_URL\" ]; then \
+    export DB_PROVIDER=postgres && ../../node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma; \
+  else \
+    ../../node_modules/.bin/tsx sources/standalone.ts migrate; \
+  fi && \
+  exec ../../node_modules/.bin/tsx sources/standalone.ts serve"]
