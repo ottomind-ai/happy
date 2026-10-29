@@ -13,6 +13,8 @@ import { t } from '@/text';
 import { FileIcon } from '@/components/FileIcon';
 import { resolveSessionFilePath } from '@/utils/sessionFileLinks';
 import { MobileGlassSurface } from '@/components/MobileGlass';
+import { SessionImage } from '@/components/SessionImage';
+import { sessionImageMimeType } from '@/utils/sessionImage';
 
 interface FileContent {
     content: string;
@@ -105,17 +107,19 @@ export default React.memo(function FileScreen() {
     const resolvedPath = resolveSessionFilePath(rawPath, sessionPath);
     const filePath = resolvedPath?.absolutePath ?? rawPath;
     const gitDiffPath = resolvedPath?.withinSessionRoot ? resolvedPath.relativePath : null;
+    // Images are read and shown by SessionImage, not as text.
+    const isImage = sessionImageMimeType(filePath) !== null;
 
     // Read from Zustand cache for instant rendering on revisit
     const cached = useSessionFileCache(sessionId!, filePath);
 
     const [fileContent, setFileContent] = React.useState<FileContent | null>(() => {
-        if (!cached) return null;
+        if (!cached || isImage) return null;
         return { content: cached.content ?? '', encoding: 'utf8', isBinary: cached.isBinary };
     });
     const [diffContent, setDiffContent] = React.useState<string | null>(() => cached?.diff ?? null);
     const [displayMode, setDisplayMode] = React.useState<'file' | 'diff'>('diff');
-    const [isLoading, setIsLoading] = React.useState(!cached);
+    const [isLoading, setIsLoading] = React.useState(!cached && !isImage);
     const [error, setError] = React.useState<string | null>(null);
     const scrollViewRef = React.useRef<ScrollView | null>(null);
 
@@ -197,6 +201,10 @@ export default React.memo(function FileScreen() {
         let isCancelled = false;
 
         const loadFile = async () => {
+            if (isImage) {
+                setIsLoading(false);
+                return;
+            }
             try {
                 // Only show loading spinner if no cache
                 if (!cached) {
@@ -279,7 +287,7 @@ export default React.memo(function FileScreen() {
         return () => {
             isCancelled = true;
         };
-    }, [filePath, gitDiffPath, isBinaryFile, sessionId, sessionPath]);
+    }, [filePath, gitDiffPath, isBinaryFile, isImage, sessionId, sessionPath]);
 
     // Show error modal if there's an error
     React.useEffect(() => {
@@ -484,40 +492,49 @@ export default React.memo(function FileScreen() {
             )}
 
             {/* Content display */}
-            <ScrollView
-                ref={scrollViewRef}
-                style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16, maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}
-                showsVerticalScrollIndicator={true}
-            >
-                {displayMode === 'diff' && diffContent ? (
-                    <DiffDisplay diffContent={diffContent} />
-                ) : displayMode === 'file' && fileContent?.content ? (
-                    <SimpleSyntaxHighlighter
-                        code={fileContent.content}
-                        language={language}
-                        selectable={true}
-                    />
-                ) : displayMode === 'file' && fileContent && !fileContent.content ? (
-                    <Text style={{
-                        fontSize: 16,
-                        color: theme.colors.textSecondary,
-                        fontStyle: 'italic',
-                        ...Typography.default()
-                    }}>
-                        {t('files.fileEmpty')}
-                    </Text>
-                ) : !diffContent && !fileContent?.content ? (
-                    <Text style={{
-                        fontSize: 16,
-                        color: theme.colors.textSecondary,
-                        fontStyle: 'italic',
-                        ...Typography.default()
-                    }}>
-                        {t('files.noChanges')}
-                    </Text>
-                ) : null}
-            </ScrollView>
+            {isImage ? (
+                <SessionImage
+                    sessionId={sessionId!}
+                    path={filePath}
+                    style={styles.image}
+                    accessibilityLabel={fileName}
+                />
+            ) : (
+                <ScrollView
+                    ref={scrollViewRef}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 16, maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}
+                    showsVerticalScrollIndicator={true}
+                >
+                    {displayMode === 'diff' && diffContent ? (
+                        <DiffDisplay diffContent={diffContent} />
+                    ) : displayMode === 'file' && fileContent?.content ? (
+                        <SimpleSyntaxHighlighter
+                            code={fileContent.content}
+                            language={language}
+                            selectable={true}
+                        />
+                    ) : displayMode === 'file' && fileContent && !fileContent.content ? (
+                        <Text style={{
+                            fontSize: 16,
+                            color: theme.colors.textSecondary,
+                            fontStyle: 'italic',
+                            ...Typography.default()
+                        }}>
+                            {t('files.fileEmpty')}
+                        </Text>
+                    ) : !diffContent && !fileContent?.content ? (
+                        <Text style={{
+                            fontSize: 16,
+                            color: theme.colors.textSecondary,
+                            fontStyle: 'italic',
+                            ...Typography.default()
+                        }}>
+                            {t('files.noChanges')}
+                        </Text>
+                    ) : null}
+                </ScrollView>
+            )}
         </View>
     );
 });
@@ -529,5 +546,9 @@ const styles = StyleSheet.create((theme) => ({
         // contentContainerStyle so it lines up with the chat / changes views.
         flex: 1,
         backgroundColor: Platform.select({ web: theme.colors.surface, default: 'transparent' }),
-    }
+    },
+    image: {
+        flex: 1,
+        margin: 16,
+    },
 }));

@@ -692,6 +692,8 @@ export const zhHans: TranslationStructure = {
         fileConflictDescription: '编辑期间文件已在设备上被修改。重新加载以查看最新版本。',
         reload: '重新加载',
         overwrite: '覆盖',
+        imageTooLarge: ({ size }: { size: string }) => `图片太大，无法预览（${size}）`,
+        imageLoadFailed: '无法加载图片',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `再显示 ${count} 行`,

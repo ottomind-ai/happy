@@ -707,6 +707,8 @@ export const ru: TranslationStructure = {
         fileConflictDescription: 'Файл был изменён на устройстве пока вы его редактировали. Перезагрузите чтобы увидеть актуальную версию.',
         reload: 'Перезагрузить',
         overwrite: 'Перезаписать',
+        imageTooLarge: ({ size }: { size: string }) => `Изображение слишком большое для просмотра (${size})`,
+        imageLoadFailed: 'Не удалось загрузить изображение',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) =>
