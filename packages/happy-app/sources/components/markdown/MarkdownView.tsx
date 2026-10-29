@@ -8,7 +8,7 @@ import { Text } from '../StyledText';
 import { Typography } from '@/constants/Typography';
 import { SimpleSyntaxHighlighter } from '../SimpleSyntaxHighlighter';
 import { Modal } from '@/modal';
-import { useLocalSetting } from '@/sync/storage';
+import { storage, useLocalSetting } from '@/sync/storage';
 import { storeTempText } from '@/sync/persistence';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -17,6 +17,8 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
+import { resolveSessionImagePath } from '@/utils/sessionImage';
+import { SessionImage } from '../SessionImage';
 
 // Option type for callback
 export type Option = {
@@ -84,7 +86,7 @@ export const MarkdownView = React.memo((props: {
                     } else if (block.type === 'table') {
                         return <RenderTableBlock headers={block.headers} rows={block.rows} onLinkPress={handleLinkPress} selectable={selectable} key={index} first={index === 0} last={index === blocks.length - 1} />;
                     } else if (block.type === 'image') {
-                        return <RenderImageBlock url={block.url} alt={block.alt} key={index} first={index === 0} last={index === blocks.length - 1} />;
+                        return <RenderImageBlock url={block.url} alt={block.alt} sessionId={props.sessionId} key={index} first={index === 0} last={index === blocks.length - 1} />;
                     } else {
                         return null;
                     }
@@ -212,17 +214,46 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
     );
 }
 
-function RenderImageBlock(props: { url: string, alt: string, first: boolean, last: boolean }) {
+function RenderImageBlock(props: { url: string, alt: string, sessionId?: string, first: boolean, last: boolean }) {
     const accessibleLabel = props.alt || 'Markdown image';
+    const router = useRouter();
+    const sessionRoot = storage((state) => props.sessionId ? state.sessions[props.sessionId]?.metadata?.path ?? null : null);
+    // Agents (e.g. Codex imagegen) reference images they saved on the session's
+    // machine by path; the app reads those over the session RPC.
+    const localPath = props.sessionId ? resolveSessionImagePath(props.url, sessionRoot) : null;
+
+    const openLocalImage = React.useCallback(() => {
+        if (!props.sessionId || !localPath) {
+            return;
+        }
+        let encodedPath: string;
+        try {
+            encodedPath = btoa(localPath);
+        } catch {
+            // btoa takes Latin-1 only, like the file screen's atob.
+            return;
+        }
+        router.push(`/session/${props.sessionId}/file?path=${encodedPath}`);
+    }, [localPath, props.sessionId, router]);
 
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
-            <Image
-                source={{ uri: props.url }}
-                style={style.image}
-                accessibilityLabel={accessibleLabel}
-                resizeMode="contain"
-            />
+            {props.sessionId && localPath ? (
+                <SessionImage
+                    sessionId={props.sessionId}
+                    path={localPath}
+                    style={style.image}
+                    accessibilityLabel={accessibleLabel}
+                    onPress={openLocalImage}
+                />
+            ) : (
+                <Image
+                    source={{ uri: props.url }}
+                    style={style.image}
+                    accessibilityLabel={accessibleLabel}
+                    resizeMode="contain"
+                />
+            )}
             {props.alt ? (
                 <Text style={style.imageCaption}>{props.alt}</Text>
             ) : null}

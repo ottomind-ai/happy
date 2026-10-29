@@ -691,6 +691,8 @@ export const ca: TranslationStructure = {
         fileConflictDescription: 'Aquest fitxer s\'ha modificat al dispositiu mentre l\'editaves. Recarrega per veure la darrera versió.',
         reload: 'Recarregar',
         overwrite: 'Sobreescriure',
+        imageTooLarge: ({ size }: { size: string }) => `Imatge massa gran per previsualitzar (${size})`,
+        imageLoadFailed: 'No s\'ha pogut carregar la imatge',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `Mostra ${count} línies més`,

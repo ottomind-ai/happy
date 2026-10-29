@@ -727,6 +727,8 @@ export const en = {
         fileConflictDescription: 'This file was modified on the device while you were editing. Reload to see the latest version.',
         reload: 'Reload',
         overwrite: 'Overwrite',
+        imageTooLarge: ({ size }: { size: string }) => `Image too large to preview (${size})`,
+        imageLoadFailed: 'Could not load image',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `Show ${count} more lines`,

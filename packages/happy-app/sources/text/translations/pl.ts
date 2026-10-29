@@ -707,6 +707,8 @@ export const pl: TranslationStructure = {
         fileConflictDescription: 'Ten plik został zmodyfikowany na urządzeniu podczas edycji. Załaduj ponownie aby zobaczyć najnowszą wersję.',
         reload: 'Załaduj ponownie',
         overwrite: 'Nadpisz',
+        imageTooLarge: ({ size }: { size: string }) => `Obraz jest za duży do podglądu (${size})`,
+        imageLoadFailed: 'Nie udało się wczytać obrazu',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `Pokaż jeszcze ${count} wierszy`,

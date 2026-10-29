@@ -690,6 +690,8 @@ export const pt: TranslationStructure = {
         fileConflictDescription: 'Este arquivo foi modificado no dispositivo enquanto você o editava. Recarregue para ver a versão mais recente.',
         reload: 'Recarregar',
         overwrite: 'Sobrescrever',
+        imageTooLarge: ({ size }: { size: string }) => `Imagem grande demais para visualizar (${size})`,
+        imageLoadFailed: 'Não foi possível carregar a imagem',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `Mostrar mais ${count} linhas`,

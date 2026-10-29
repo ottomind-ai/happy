@@ -691,6 +691,8 @@ export const zhHant: TranslationStructure = {
         fileConflictDescription: '編輯期間檔案已在裝置上被修改。重新載入以查看最新版本。',
         reload: '重新載入',
         overwrite: '覆蓋',
+        imageTooLarge: ({ size }: { size: string }) => `圖片太大，無法預覽（${size}）`,
+        imageLoadFailed: '無法載入圖片',
     },
     diff: {
         showMoreLines: ({ count }: { count: number }) => `再顯示 ${count} 行`,

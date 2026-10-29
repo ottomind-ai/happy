@@ -17,6 +17,8 @@ import { t } from '@/text';
 import { layout } from '@/components/layout';
 import { useSession } from '@/sync/storage';
 import { rigCanWriteFiles } from '@/sync/rig';
+import { SessionImage } from '@/components/SessionImage';
+import { sessionImageMimeType } from '@/utils/sessionImage';
 
 interface FileViewPanelProps {
     sessionId: string;
@@ -29,6 +31,7 @@ type FileState =
     | { kind: 'loading' }
     | { kind: 'error'; message: string }
     | { kind: 'binary' }
+    | { kind: 'image' }
     | { kind: 'loaded'; content: string; originalHash: string | null };
 
 function getFileLanguage(path: string): string | null {
@@ -156,6 +159,11 @@ export const FileViewPanel = React.memo(function FileViewPanel({
         setFileState({ kind: 'loading' });
         setExternalChange(null);
         setShowConflictDiff(false);
+
+        if (sessionImageMimeType(filePath)) {
+            setFileState({ kind: 'image' });
+            return;
+        }
 
         if (isBinaryExtension(filePath)) {
             setFileState({ kind: 'binary' });
@@ -402,6 +410,13 @@ export const FileViewPanel = React.memo(function FileViewPanel({
                         {fileState.message}
                     </Text>
                 </View>
+            ) : fileState.kind === 'image' ? (
+                <SessionImage
+                    sessionId={sessionId}
+                    path={filePath}
+                    style={styles.image}
+                    accessibilityLabel={fileName}
+                />
             ) : fileState.kind === 'binary' ? (
                 <View style={styles.centered}>
                     <Ionicons name="document-outline" size={32} color={theme.colors.textSecondary} />
@@ -680,5 +695,9 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+    },
+    image: {
+        flex: 1,
+        margin: 16,
     },
 }));
